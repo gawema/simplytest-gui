@@ -234,20 +234,20 @@ export default function Home() {
           <Card key={medication.id} className="h-[400px] flex flex-col">
             <CardHeader className="relative h-48">
               <div className="absolute inset-0 bg-muted rounded-t-lg">
-                {medication.imageUrl && (
+                
                   <img
-                    src={medication.imageUrl}
+                    src={medication.imageUrl || "https://img.freepik.com/vettori-premium/pillole-e-compresse-di-farmaci-su-sfondo-blu-farmaco-concetto-farmaceutico-illustrazione-di-stile-piatto_285336-1104.jpg"}
                     alt={medication.name}
                     className="w-full h-full object-cover rounded-t-lg"
                   />
-                )}
+                
               </div>
             </CardHeader>
             <CardContent className="flex-grow">
               <h2 className="text-xl font-semibold mb-2">{medication.name}</h2>
-              <p className="text-muted-foreground line-clamp-3">{medication.description}</p>
-              {medication.price && (
-                <p className="text-lg font-bold mt-2">${medication.price.toFixed(2)}</p>
+              <p className="text-muted-foreground line-clamp-3 mb-2">{medication.description}</p>
+              {medication.price !== 0 && (
+                <p className="text-lg ">€ {medication.price.toFixed(2)}</p>
               )}
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
