@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import MedicationModal from '@/components/MedicationModal';
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 
 interface Medication {
   id: string;
@@ -14,25 +16,177 @@ interface Medication {
   imageUrl: string;
 }
 
+const API_BASE_URL = 'https://simplytest-api.onrender.com';
+
+// Timeout for API calls (90 seconds)
+const FETCH_TIMEOUT = 90000;
+
+// Helper function to fetch with timeout
+const fetchWithTimeout = async (url: string, options: RequestInit = {}) => {
+  console.log('Attempting fetch to:', url); // Debug log
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      // Add CORS headers
+      mode: 'cors',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+    clearTimeout(timeout);
+    console.log('Fetch response:', response.status); // Debug log
+    return response;
+  } catch (error) {
+    clearTimeout(timeout);
+    console.error('Fetch error:', error); // Debug log
+    throw error;
+  }
+};
+
 export default function Home() {
+  console.log('Component rendering'); // Debug log
+
   const [medications, setMedications] = useState<Medication[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMedication, setEditingMedication] = useState<Medication | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const { toast } = useToast();
 
-  const handleAddEdit = (medication: Medication) => {
-    if (editingMedication) {
-      setMedications(medications.map(med => 
-        med.id === medication.id ? medication : med
-      ));
-    } else {
-      setMedications([...medications, { ...medication, id: Date.now().toString() }]);
+  useEffect(() => {
+    console.log('useEffect triggered'); // Debug log
+    fetchMedications();
+  }, []);
+
+  const fetchMedications = async () => {
+    console.log('fetchMedications called'); // Debug log
+    try {
+      if (isInitialLoad) {
+        toast({
+          title: "Loading",
+          description: "The server may take up to a minute to respond on first load...",
+        });
+      }
+
+      console.log('Making API call...'); // Debug log
+      const response = await fetchWithTimeout(`${API_BASE_URL}/medications`);
+      console.log('API response received'); // Debug log
+      
+      if (!response.ok) throw new Error('Failed to fetch medications');
+      const data = await response.json();
+      console.log('Medications data:', data); // Debug log
+      
+      setMedications(data);
+      
+      if (isInitialLoad) {
+        toast({
+          title: "Success",
+          description: "Medications loaded successfully!",
+        });
+        setIsInitialLoad(false);
+      }
+    } catch (error) {
+      console.error('Error in fetchMedications:', error); // Debug log
+      const isTimeout = error instanceof Error && error.name === 'AbortError';
+      toast({
+        title: "Error",
+        description: isTimeout 
+          ? "Request timed out. The server might be starting up, please try again." 
+          : "Failed to load medications",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
-    setIsModalOpen(false);
-    setEditingMedication(null);
   };
 
-  const handleDelete = (id: string) => {
-    setMedications(medications.filter(med => med.id !== id));
+  const handleAddEdit = async (medication: Medication) => {
+    try {
+      if (editingMedication) {
+        const response = await fetchWithTimeout(`${API_BASE_URL}/medications/${medication.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(medication),
+        });
+        
+        if (!response.ok) throw new Error('Failed to update medication');
+        
+        setMedications(medications.map(med => 
+          med.id === medication.id ? medication : med
+        ));
+        
+        toast({
+          title: "Success",
+          description: "Medication updated successfully",
+        });
+      } else {
+        const response = await fetchWithTimeout(`${API_BASE_URL}/medications`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(medication),
+        });
+        
+        if (!response.ok) throw new Error('Failed to create medication');
+        
+        const newMedication = await response.json();
+        setMedications([...medications, newMedication]);
+        
+        toast({
+          title: "Success",
+          description: "Medication added successfully",
+        });
+      }
+    } catch (error) {
+      const isTimeout = error instanceof Error && error.name === 'AbortError';
+      toast({
+        title: "Error",
+        description: isTimeout 
+          ? "Request timed out. Please try again." 
+          : editingMedication 
+            ? "Failed to update medication" 
+            : "Failed to add medication",
+        variant: "destructive",
+      });
+    } finally {
+      setIsModalOpen(false);
+      setEditingMedication(null);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const response = await fetchWithTimeout(`${API_BASE_URL}/medications/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) throw new Error('Failed to delete medication');
+      
+      setMedications(medications.filter(med => med.id !== id));
+      
+      toast({
+        title: "Success",
+        description: "Medication deleted successfully",
+      });
+    } catch (error) {
+      const isTimeout = error instanceof Error && error.name === 'AbortError';
+      toast({
+        title: "Error",
+        description: isTimeout 
+          ? "Request timed out. Please try again." 
+          : "Failed to delete medication",
+        variant: "destructive",
+      });
+    }
   };
 
   const openEditModal = (medication: Medication) => {
@@ -42,7 +196,27 @@ export default function Home() {
 
   return (
     <div className="container mx-auto p-8">
-      <h1 className="text-3xl font-bold mb-8">Medication Management</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Medication Management</h1>
+        <div className="flex gap-2">
+          {!isLoading && medications.length === 0 && (
+            <Button 
+              onClick={fetchMedications}
+              variant="outline"
+            >
+              Retry Loading
+            </Button>
+          )}
+          <Button 
+            onClick={() => {
+              setIsLoading(true);
+              fetchMedications();
+            }}
+          >
+            Refresh Data
+          </Button>
+        </div>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {/* Add New Medication Card */}
@@ -59,8 +233,27 @@ export default function Home() {
           </CardContent>
         </Card>
 
+        {/* Loading Skeletons */}
+        {isLoading && Array.from({ length: 3 }).map((_, index) => (
+          <Card key={`skeleton-${index}`} className="h-[400px] flex flex-col">
+            <CardHeader className="relative h-48">
+              <Skeleton className="absolute inset-0 rounded-t-lg" />
+            </CardHeader>
+            <CardContent className="flex-grow space-y-3">
+              <Skeleton className="h-6 w-2/3" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-1/2" />
+            </CardContent>
+            <CardFooter className="flex justify-end gap-2">
+              <Skeleton className="h-10 w-10" />
+              <Skeleton className="h-10 w-10" />
+            </CardFooter>
+          </Card>
+        ))}
+
         {/* Medication Cards */}
-        {medications.map((medication) => (
+        {!isLoading && medications.map((medication) => (
           <Card key={medication.id} className="h-[400px] flex flex-col">
             <CardHeader className="relative h-48">
               <div className="absolute inset-0 bg-muted rounded-t-lg">
