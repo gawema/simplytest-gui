@@ -16,7 +16,7 @@ interface Medication {
   imageUrl: string;
 }
 
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'https://simplytest-api.onrender.com';
 
 // Timeout for API calls (90 seconds)
 const FETCH_TIMEOUT = 90000;
