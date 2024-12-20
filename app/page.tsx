@@ -16,14 +16,13 @@ interface Medication {
   imageUrl: string;
 }
 
-const API_BASE_URL = 'https://simplytest-api.onrender.com';
+const API_BASE_URL = 'http://localhost:8080';
 
 // Timeout for API calls (90 seconds)
 const FETCH_TIMEOUT = 90000;
 
 // Helper function to fetch with timeout
 const fetchWithTimeout = async (url: string, options: RequestInit = {}) => {
-  console.log('Attempting fetch to:', url); // Debug log
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
   
@@ -31,20 +30,16 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}) => {
     const response = await fetch(url, {
       ...options,
       signal: controller.signal,
-      // Add CORS headers
-      mode: 'cors',
       headers: {
-        'Accept': 'application/json',
         'Content-Type': 'application/json',
+        // Add any Authorization header if needed
         ...options.headers,
       },
     });
     clearTimeout(timeout);
-    console.log('Fetch response:', response.status); // Debug log
     return response;
   } catch (error) {
     clearTimeout(timeout);
-    console.error('Fetch error:', error); // Debug log
     throw error;
   }
 };
@@ -197,25 +192,7 @@ export default function Home() {
   return (
     <div className="container mx-auto p-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Medication Management</h1>
-        <div className="flex gap-2">
-          {!isLoading && medications.length === 0 && (
-            <Button 
-              onClick={fetchMedications}
-              variant="outline"
-            >
-              Retry Loading
-            </Button>
-          )}
-          <Button 
-            onClick={() => {
-              setIsLoading(true);
-              fetchMedications();
-            }}
-          >
-            Refresh Data
-          </Button>
-        </div>
+        <h1 className="text-3xl font-bold">Simplytest</h1>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -269,7 +246,9 @@ export default function Home() {
             <CardContent className="flex-grow">
               <h2 className="text-xl font-semibold mb-2">{medication.name}</h2>
               <p className="text-muted-foreground line-clamp-3">{medication.description}</p>
-              <p className="text-lg font-bold mt-2">${medication.price.toFixed(2)}</p>
+              {medication.price && (
+                <p className="text-lg font-bold mt-2">${medication.price.toFixed(2)}</p>
+              )}
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
               <Button
